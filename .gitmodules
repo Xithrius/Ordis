@@ -1,0 +1,6 @@
+[submodule "ordis-api"]
+	path = ordis-api
+	url = https://github.com/Xithrius/ordis-api
+[submodule "ordis-bot"]
+	path = ordis-bot
+	url = https://github.com/Xithrius/ordis-bot

@@ -1,0 +1,80 @@
+version: "3.8"
+
+x-logging-loki: &logging_loki
+  logging:
+    driver: loki
+    options:
+      loki-url: "http://localhost:3100/api/prom/push"
+      loki-pipeline-stages: |
+        - multiline:
+            firstline: '^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2}'
+            max_wait_time: 3s
+        - regex:
+            expression: '^(?P<time>\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2},d{3}) (?P<message>(?s:.*))$$'
+
+x-logging-json: &logging_json
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+
+x-restart-policy:
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *logging_loki
+
+    image: "ghcr.io/xithrius/ordis/api:latest"
+
+    env_file:
+    - .env
+
+    environment:
+      ORDIS_API_ENVIRONMENT: "production"
+      ORDIS_API_RELOAD: "false"
+      ORDIS_API_DB_HOST: "postgres"
+      ORDIS_API_HOST: "0.0.0.0"
+      ORDIS_API_OPENTELEMETRY_ENDPOINT: "http://tempo:4317"
+
+    volumes:
+    - ./api:/api
+
+    labels:
+    - "com.centurylinklabs.watchtower.enable=true"
+
+    networks:
+    - database-access
+    - infra-metrics
+
+  bot:
+    <<: *logging_json
+
+    image: "ghcr.io/xithrius/ordis/bot:latest"
+
+    env_file:
+    - .env
+
+    environment:
+      API_URL: "http://api:8000"
+
+    depends_on:
+    - api
+
+    volumes:
+    - ./bot:/bot
+
+    labels:
+    - "com.centurylinklabs.watchtower.enable=true"
+
+    networks:
+    - infra-metrics
+
+networks:
+  database-access:
+    name: database-access
+    external: true
+  infra-metrics:
+    name: infra-metrics
+    external: true
